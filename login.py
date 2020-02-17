@@ -32,8 +32,10 @@ def get_polices(header):
     return result
 
 def changepassword(uname,pwd,polices):
-    new_credential = {'credentials': {'edit': {'7': {'username': '%s'%uname, 'password': '%s'%pwd, 'domain': 'test.local', 'auth_method': 'Password'}}}}
-    polices['credentials'] = new_credential['credentials']
+    logID = list(polices['credentials']['edit'].keys())[0]
+    polices['credentials']['edit'][logID]['username'] = uname
+    polices['credentials']['edit'][logID]['password'] = pwd
+    print(polices['credentials'])
     return polices
     
 def get_polices_detail(id):
@@ -46,7 +48,7 @@ def get_polices_detail(id):
     
 def copy_newpolicy(id):
     result = ''
-    url = "https://192.168.232.139:8834/policies/%d/copy"%d
+    url = "https://192.168.232.139:8834/policies/%d/copy"%id
     respon = requests.post(url, headers=header, verify=False)
     if respon.status_code == 200:
         result = json.loads(respon.text)
@@ -54,21 +56,65 @@ def copy_newpolicy(id):
     
 def change_offices(id,polices):
     result = ''
-    url = "https://192.168.232.139:8834/policies/9"
-    #url = "https://192.168.232.139:8834/policies"
+    url = "https://192.168.232.139:8834/policies/%d"%id
     header = {'X-ApiKeys': 'accessKey={accesskey};secretKey={secretkey}'.format(accesskey=AccessKey, secretkey=SecretKey),
           'Content-type': 'application/json',
           'Accept': 'text/plain'}
-    make_head = {'credentials': {'edit': {'10': {'username': 'userA', 'password': 'passwordA', 'domain': 'test.local', 'auth_method': 'Password'}}}, 'settings': {'patch_audit_over_rexec': 'no', 'patch_audit_over_rsh': 'no', 'ssh_client_banner': 'OpenSSH_5.0', 'description': 'just a test', 'http_login_auth_regex_nocase': 'no', 'http_login_method': 'POST', 'ssh_port': '22', 'report_verbosity': 'Normal', 'enable_admin_shares': 'no', 'http_login_invert_auth_regex': 'no', 'dont_use_ntlmv1': 'yes', 'additional_snmp_port3': '161', 'allow_post_scan_editing': 'yes', 'display_unreachable_hosts': 'no', 'assessment_mode': 'Default', 'start_remote_registry': 'yes', 'http_login_auth_regex_on_headers': 'no', 'silent_dependencies': 'yes', 'ssh_known_hosts': '', 'patch_audit_over_telnet': 'no', 'http_login_max_redir': '0', 'http_reauth_delay': '0', 'advanced_mode': 'Default', 'attempt_least_privilege': 'no', 'reverse_lookup': 'no', 'never_send_win_creds_in_the_clear': 'yes', 'additional_snmp_port2': '161', 'report_superseded_patches': 'yes', 'additional_snmp_port1': '161', 'snmp_port': '161', 'name': 'Copy of testpolices'}, 'uuid': 'd16c51fa-597f-67a8-9add-74d5ab066b49a918400c42a035f7'}
-    respon = requests.put(url, headers=header, verify=False, data=json.dumps(make_head))
-    #print(make_head)
+    respon = requests.put(url, headers=header, verify=False, data=json.dumps(polices))
     print(respon.text)
+    
+    
+"""
+Input we need:
+    {
+        "uuid": {template_uuid},
+        "settings": {
+            "name": {string},
+            "description": {string},
+            "emails": {string},
+            "enabled": "true",
+            "launch": {string},
+            "folder_id": {integer},
+            "policy_id": {integer},
+            "scanner_id": {integer},
+            "text_targets": {string},
+            "agent_group_id": []
+        }
+    }
+"""
+def assign_scan(new_uuid, police_id):
+    url = "https://192.168.232.139:8834/scans"
+    scan_detail ={
+        'uuid': '{template_uuid}'.format(template_uuid = new_uuid),
+        "settings": {
+            "name":'{name}'.format(name = "API Crafted Scan"),
+            "description":'{description}'.format(description = "Just a test scan"),
+            "enabled": "true",
+            "launch":'{launch}'.format(launch = "ON_DEMAND"),
+            "policy_id":'{policy_id}'.format(policy_id = police_id),
+            "text_targets":'{text_targets}'.format(text_targets = "10.11.1.230"),
+            "agent_group_id": []
+        }
+    }
+    respon = requests.post(url, headers=header, verify=False, data=json.dumps(scan_detail))
+    return(respon.text)
     
 
 if __name__ == '__main__':
-    first_record_id = get_polices(header)['policies'][1]['id'] #obtain the first record
-    polices = (get_polices_detail(first_record_id))
-    print(polices)
-    new_police = changepassword("userA","passwordA",polices)
-    change_offices(first_record_id,new_police)
+    
+    all_record = get_polices(header)['policies']
+    Polices_Arr = []
+    for i in all_record:
+        Polices_Arr.append({ i['name']: i['id']})
+        if(i['name']=='Base_Advance_Scan_Windows'):
+            windows_base_temp_id = i['id']
+            break
+    #new_polices_id = copy_newpolicy(windows_base_temp_id)['id']
+    #print(new_polices_id)
+    print(get_polices_detail(windows_base_temp_id))
+    print(assign_scan("ad629e16-03b6-8c1d-cef6-ef8c9dd3c658d24bd260ef5f9e66",windows_base_temp_id))
+    #police_need = (get_polices_detail(new_polices_id))
+    #print(police_need['credentials'])
+    #new_police = changepassword("root","rootpassword",police_need)
+    #change_offices(new_polices_id,new_police)
 
